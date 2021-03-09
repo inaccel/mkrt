@@ -1,0 +1,77 @@
+#!/bin/sh
+
+# Copyright © 2018-2021 InAccel
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ ${DEBUG} ] && set -vx
+set -eu
+
+SYSROOT_DIR=$(realpath ${MKRT_SYSROOT_DIR:-/})
+CONFIG_PATH=$(realpath --canonicalize-missing ${MKRT_CONFIG_PATH:-/etc/inaccel/runtimes})
+
+TOP_BUILD_DIR=$(realpath ${MKRT_TOP_BUILD_DIR:-/var/opt/inaccel/runtimes})
+
+for runtime in $(find ${SYSROOT_DIR}/${CONFIG_PATH} -name inaccel.pc); do
+	pcfiledir=$(dirname ${runtime})
+	prefix=${TOP_BUILD_DIR}/$(basename ${pcfiledir})
+
+	modversion=$(PKG_CONFIG_PATH=${pcfiledir} pkg-config --modversion inaccel)
+
+	rm --force --recursive ${prefix}
+	mkdir --mode 0755 --parents ${prefix}/lib
+
+	for variable in $(PKG_CONFIG_PATH=${pcfiledir} pkg-config --print-variables inaccel); do
+		if [ ${variable} != pcfiledir ]; then
+			echo ${variable}=$(PKG_CONFIG_PATH=${pcfiledir} pkg-config --variable ${variable} inaccel) >> ${prefix}/.env
+		fi
+	done
+
+	cp ${pcfiledir}/a.out ${prefix}/lib.so.${modversion}
+	ln --symbolic lib.so.${modversion} ${prefix}/lib.so
+
+	interp=$(rtldd --sysroot ${SYSROOT_DIR} --verify ${prefix}/lib.so)
+
+	cp --force ${SYSROOT_DIR}/${interp} ${prefix}/ld.so
+
+	libs=$(PKG_CONFIG_PATH=${pcfiledir} PKG_CONFIG_SYSROOT_DIR=${SYSROOT_DIR} pkg-config --libs inaccel)
+	if [ "${libs}" ]; then
+		temp=$(mktemp)
+
+		for path in $(ld --output ${temp} --shared --sysroot ${SYSROOT_DIR} --trace ${libs} | xargs -L 1 dirname | uniq); do
+			library_path="/$(realpath --no-symlinks --relative-to ${SYSROOT_DIR} ${path}) ${library_path:-}"
+		done
+		library_path=$(echo ${library_path:-} | tr ' ' :)
+
+		for needed in $(patchelf --print-needed ${temp}); do
+			patchelf --add-needed ${needed} ${prefix}/lib.so
+		done
+
+		rm --force ${temp}
+	fi
+
+	ldd=$(LD_LIBRARY_PATH=${library_path:-''} rtldd --sysroot ${SYSROOT_DIR} ${prefix}/lib.so)
+
+	for path in $(echo ${ldd} | grep --only-matching --perl-regexp ' => \K/.+? '); do
+		needed=$(basename ${path})
+		lib=${prefix}/lib/${needed}
+		soname=$(echo ${lib} | grep --only-matching --perl-regexp .*.so)
+
+		cp --force ${SYSROOT_DIR}/${path} ${lib}
+		if [ ! -f ${soname} ]; then
+			ln --symbolic ${needed} ${soname}
+		fi
+	done
+
+	patchelf --force-rpath --set-rpath '$ORIGIN'/lib ${prefix}/lib.so
+done

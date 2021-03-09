@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  mkrt:
+    build: .
+    environment:
+    - MKRT_CONFIG_PATH
+    - MKRT_SYSROOT_DIR=/host
+    image: inaccel/mkrt:${TAG:-latest}
+    volumes:
+    - /:/host:ro
+    - ${MKRT_TOP_BUILD_DIR:-/var/opt/inaccel/runtimes}:/var/opt/inaccel/runtimes
