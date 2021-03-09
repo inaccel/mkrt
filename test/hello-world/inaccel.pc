@@ -1,0 +1,4 @@
+Name: Hello World
+Version: 0
+Description: $ gcc main.c
+URL: https://github.com/inaccel/mkrt
