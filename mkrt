@@ -75,3 +75,5 @@ for runtime in $(find ${SYSROOT_DIR}/${CONFIG_PATH} -name inaccel.pc); do
 
 	patchelf --force-rpath --set-rpath '$ORIGIN'/lib ${prefix}/lib.so
 done
+
+${@}
