@@ -1,0 +1,4 @@
+Name: Command cgo
+Version: -
+Description: Go references to C
+URL: https://golang.org/cmd/cgo
