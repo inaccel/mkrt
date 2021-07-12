@@ -60,7 +60,7 @@ for runtime in $(find ${SYSROOT_DIR}/${CONFIG_PATH} -name inaccel.pc); do
 		rm --force ${temp}
 	fi
 
-	ldd=$(LD_LIBRARY_PATH=${library_path:-''} rtldd --sysroot ${SYSROOT_DIR} ${prefix}/lib.so)
+	ldd=$(LD_LIBRARY_PATH=${library_path:-''}:${LD_LIBRARY_PATH:-''} rtldd --sysroot ${SYSROOT_DIR} ${prefix}/lib.so)
 
 	for path in $(echo ${ldd} | grep --only-matching --perl-regexp ' => \K/.+? '); do
 		needed=$(basename ${path})
