@@ -25,3 +25,11 @@ jobs:
         tags: |
           inaccel/mkrt:latest
           inaccel/mkrt:${{ github.event.inputs.version }}
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        body: |
+          ## Docker images
+
+          - `docker pull inaccel/mkrt:${{ github.event.inputs.version }}`
+        tag_name: ${{ github.event.inputs.version }}
