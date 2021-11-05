@@ -71,6 +71,8 @@ for runtime in $(find ${SYSROOT_DIR}/${CONFIG_PATH} -name inaccel.pc); do
 		if [ ! -f ${soname} ]; then
 			ln --symbolic ${needed} ${soname}
 		fi
+
+		patchelf --force-rpath --set-rpath '$ORIGIN' ${lib}
 	done
 
 	patchelf --force-rpath --set-rpath '$ORIGIN'/lib ${prefix}/lib.so
