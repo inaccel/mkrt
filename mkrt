@@ -25,7 +25,7 @@ for inaccel in $(find $(realpath --canonicalize-missing ${SYSROOT_DIR}/${MKRT_CO
 	runtime=$(basename ${pcfiledir})
 	prefix=$(realpath --canonicalize-missing ${TOP_BUILD_DIR}/${runtime})
 
-	if [ ! -f ${pcfiledir}/a.out ]; then
+	if [ ${runtime} != ${runtime#.} ] || [ ! -f ${pcfiledir}/a.out ]; then
 		continue
 	fi
 
