@@ -17,14 +17,19 @@
 [ ${DEBUG} ] && set -vx
 set -eu
 
-SYSROOT_DIR=$(realpath ${MKRT_SYSROOT_DIR:-/})
-CONFIG_PATH=$(realpath --canonicalize-missing ${MKRT_CONFIG_PATH:-/etc/inaccel/runtimes})
+SYSROOT_DIR=$(realpath --canonicalize-existing ${MKRT_SYSROOT_DIR:-/})
+TOP_BUILD_DIR=$(realpath --canonicalize-existing ${MKRT_TOP_BUILD_DIR:-/var/opt/inaccel/runtimes})
 
-TOP_BUILD_DIR=$(realpath ${MKRT_TOP_BUILD_DIR:-/var/opt/inaccel/runtimes})
+for inaccel in $(find $(realpath --canonicalize-missing ${SYSROOT_DIR}/${MKRT_CONFIG_PATH:-/etc/inaccel/runtimes}) -maxdepth 2 -mindepth 2 -name inaccel.pc); do
+	pcfiledir=$(dirname ${inaccel})
+	runtime=$(basename ${pcfiledir})
+	prefix=$(realpath --canonicalize-missing ${TOP_BUILD_DIR}/${runtime})
 
-for runtime in $(find ${SYSROOT_DIR}/${CONFIG_PATH} -name inaccel.pc); do
-	pcfiledir=$(dirname ${runtime})
-	prefix=${TOP_BUILD_DIR}/$(basename ${pcfiledir})
+	if [ ! -f ${pcfiledir}/a.out ]; then
+		continue
+	fi
+
+	echo "* ${runtime} *"
 
 	modversion=$(PKG_CONFIG_PATH=${pcfiledir} pkg-config --modversion inaccel)
 
@@ -37,20 +42,25 @@ for runtime in $(find ${SYSROOT_DIR}/${CONFIG_PATH} -name inaccel.pc); do
 		fi
 	done
 
-	cp ${pcfiledir}/a.out ${prefix}/lib.so.${modversion}
+	cp --force ${pcfiledir}/a.out ${prefix}/lib.so.${modversion}
 	ln --symbolic lib.so.${modversion} ${prefix}/lib.so
 
 	interp=$(rtldd --sysroot ${SYSROOT_DIR} --verify ${prefix}/lib.so)
 
-	cp --force ${SYSROOT_DIR}/${interp} ${prefix}/ld.so
+	cp --force $(realpath --canonicalize-missing ${SYSROOT_DIR}/${interp}) ${prefix}/ld.so
 
 	libs=$(PKG_CONFIG_PATH=${pcfiledir} PKG_CONFIG_SYSROOT_DIR=${SYSROOT_DIR} pkg-config --libs inaccel)
 	if [ "${libs}" ]; then
 		temp=$(mktemp)
 
-		for path in $(ld --output ${temp} --shared --sysroot ${SYSROOT_DIR} --trace ${libs} | xargs -L 1 dirname | uniq); do
+		for path in $(ld --output ${temp} --shared --sysroot ${SYSROOT_DIR} --trace ${libs} | xargs --no-run-if-empty dirname | uniq); do
 			library_path="/$(realpath --no-symlinks --relative-to ${SYSROOT_DIR} ${path}) ${library_path:-}"
 		done
+		if [ ! -f ${temp} ]; then
+			rm --force --recursive ${prefix}
+
+			continue
+		fi
 		library_path=$(echo ${library_path:-} | tr ' ' :)
 
 		for needed in $(patchelf --print-needed ${temp}); do
@@ -67,7 +77,7 @@ for runtime in $(find ${SYSROOT_DIR}/${CONFIG_PATH} -name inaccel.pc); do
 		lib=${prefix}/lib/${needed}
 		soname=$(echo ${lib} | grep --only-matching --perl-regexp .*.so)
 
-		cp --force ${SYSROOT_DIR}/${path} ${lib}
+		cp --force $(realpath --canonicalize-missing ${SYSROOT_DIR}/${path}) ${lib}
 		if [ ! -f ${soname} ]; then
 			ln --symbolic ${needed} ${soname}
 		fi
