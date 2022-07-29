@@ -3,8 +3,8 @@ module github.com/inaccel/mkrt/rtldd
 go 1.17
 
 require (
-	github.com/spf13/cobra v1.2.1
-	golang.org/x/sys v0.0.0-20211117180635-dee7805ff2e1
+	github.com/spf13/cobra v1.5.0
+	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10
 )
 
 require (
