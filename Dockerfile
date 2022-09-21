@@ -8,12 +8,12 @@ RUN CGO_ENABLED=0 go build -o /go/bin/rtldd
 
 FROM alpine
 RUN apk add --no-cache \
-	binutils \
-	coreutils \
-	findutils \
-	grep \
-	patchelf \
-	pkgconfig
+        binutils \
+        coreutils \
+        findutils \
+        grep \
+        patchelf \
+        pkgconfig
 COPY --from=rtldd /go/bin/rtldd /bin/rtldd
 COPY mkrt /bin/mkrt
 ENTRYPOINT ["mkrt"]
