@@ -59,7 +59,7 @@ for inaccel in $(find $(realpath --canonicalize-missing ${SYSROOT_DIR}/${MKRT_CO
 		if [ ! -f ${temp} ]; then
 			rm --force --recursive ${prefix}
 
-			continue
+			[ ${MKRT_FAIL} ] && exit 1 || continue
 		fi
 		library_path=$(echo ${library_path:-} | tr ' ' :)
 
