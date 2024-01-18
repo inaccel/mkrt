@@ -49,11 +49,11 @@ for inaccel in $(find $(realpath --canonicalize-missing ${SYSROOT_DIR}/${MKRT_CO
 
 	cp --force $(realpath --canonicalize-missing ${SYSROOT_DIR}/${interp}) ${prefix}/ld.so
 
-	libs=$(PKG_CONFIG_PATH=${pcfiledir} PKG_CONFIG_SYSROOT_DIR=${SYSROOT_DIR} pkg-config --libs inaccel)
-	if [ "${libs}" ]; then
+	all_libs=$(PKG_CONFIG_PATH=${pcfiledir} PKG_CONFIG_SYSROOT_DIR=${SYSROOT_DIR} pkg-config --libs --static inaccel)
+	if [ "${all_libs}" ]; then
 		temp=$(mktemp)
 
-		for path in $(ld --output ${temp} --shared --sysroot ${SYSROOT_DIR} --trace ${libs} | xargs --no-run-if-empty dirname | uniq); do
+		for path in $(ld --output ${temp} --shared --sysroot ${SYSROOT_DIR} --trace ${all_libs} | xargs --no-run-if-empty dirname | uniq); do
 			library_path="/$(realpath --no-symlinks --relative-to ${SYSROOT_DIR} ${path}) ${library_path:-}"
 		done
 		if [ ! -f ${temp} ]; then
@@ -84,6 +84,32 @@ for inaccel in $(find $(realpath --canonicalize-missing ${SYSROOT_DIR}/${MKRT_CO
 
 		patchelf --force-rpath --set-rpath '$ORIGIN' ${lib}
 	done
+
+	public_libs=$(PKG_CONFIG_PATH=${pcfiledir} PKG_CONFIG_SYSROOT_DIR=${SYSROOT_DIR} pkg-config --libs inaccel)
+	if [ "${public_libs}" ]; then
+		temp=$(mktemp)
+
+		ld --output ${temp} --shared --sysroot ${SYSROOT_DIR} ${public_libs} || :
+		if [ ! -f ${temp} ]; then
+			rm --force --recursive ${prefix}
+
+			[ ${MKRT_FAIL:-} ] && exit 1 || continue
+		fi
+
+		all=$(mktemp)
+		patchelf --print-needed ${prefix}/lib.so | sort > ${all}
+
+		public=$(mktemp)
+		patchelf --print-needed ${temp} | sort > ${public}
+
+		for not_needed in $(comm -3 ${all} ${public}); do
+			patchelf --remove-needed ${not_needed} ${prefix}/lib.so
+		done
+
+		rm --force ${public}
+		rm --force ${all}
+		rm --force ${temp}
+	fi
 
 	patchelf --force-rpath --set-rpath '$ORIGIN'/lib ${prefix}/lib.so
 done
